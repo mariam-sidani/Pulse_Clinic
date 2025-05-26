@@ -28,6 +28,7 @@ export default function Home() {
     error: null
   });
   const form = useRef();
+  const [minDate, setMinDate] = useState('');
 
   useEffect(() => {
     console.log('Home page - Auth state:', { isLoggedIn, role });
@@ -55,12 +56,47 @@ export default function Home() {
     fetchDoctors();
   }, []);
 
+  useEffect(() => {
+    // Get tomorrow's date as the minimum allowed date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Format as YYYY-MM-DD for the date input
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    
+    setMinDate(`${year}-${month}-${day}`);
+  }, []);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for date field
+    if (name === 'date') {
+      // Check if the selected date is not before the minimum date
+      const selectedDate = new Date(value);
+      const minimumDate = new Date(minDate);
+      
+      // Only update if date is valid and not in the past
+      if (!isNaN(selectedDate) && selectedDate >= minimumDate) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: value
+        }));
+      } else {
+        // Reset to empty if invalid date selected
+        setFormData(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -68,9 +104,9 @@ export default function Home() {
     setSubmitStatus({ isSubmitting: true, isSubmitted: false, error: null });
 
     try {
-      // Format the message for WhatsApp
-      const message = `
-New Appointment Request:
+      // Create the message
+      const message = 
+`New Appointment Request:
 
 Patient Details:
 - Name: ${formData.name}
@@ -81,37 +117,49 @@ Appointment Details:
 - Department: ${formData.department === 'other' ? formData.otherDepartment : formData.department}
 - Doctor: ${formData.doctor === 'none' ? 'No specific doctor requested' : formData.doctor}
 - Date: ${formData.date}
-- Message: ${formData.message}
-      `.trim();
+- Message: ${formData.message}`;
 
-      // Create WhatsApp URL
-  const whatsappUrl =`https://wa.me/+961?text=${encodeURIComponent(message)}`;
+      // Format phone number (remove all non-digits)
+      const phoneNumber = '96103890087'.replace(/\D/g, '');
       
-      // Open WhatsApp
-      window.open(whatsappUrl, '_blank');
-
-      // Clear form
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        department: '',
-        otherDepartment: '',
-        doctor: '',
-        date: '',
-        message: ''
-      });
+      // Check if device is mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
-      setSubmitStatus({
-        isSubmitting: false,
-        isSubmitted: true,
-        error: null
-      });
+      // Create WhatsApp URL based on device type
+      const encodedText = encodeURIComponent(message);
+      const whatsappUrl = isMobile
+        ? `whatsapp://send?phone=${phoneNumber}&text=${encodedText}`
+        : `https://web.whatsapp.com/send/?phone=${phoneNumber}&text=${encodedText}&type=phone_number&app_absent=0`;
+      
+      // Open WhatsApp in a new tab
+      const newTab = window.open(whatsappUrl, '_blank');
+      // Ensure new tab gets focus (for better user experience)
+      if (newTab) newTab.focus();
 
-      // Reset success message after 5 seconds
+      // Clear form after a short delay
       setTimeout(() => {
-        setSubmitStatus(prev => ({ ...prev, isSubmitted: false }));
-      }, 5000);
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          department: '',
+          otherDepartment: '',
+          doctor: '',
+          date: '',
+          message: ''
+        });
+        
+        setSubmitStatus({
+          isSubmitting: false,
+          isSubmitted: true,
+          error: null
+        });
+
+        // Reset success message after 5 seconds
+        setTimeout(() => {
+          setSubmitStatus(prev => ({ ...prev, isSubmitted: false }));
+        }, 5000);
+      }, 1000);
 
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -219,65 +267,79 @@ Appointment Details:
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-400"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {doctors.map((doctor) => (
-                  <div key={doctor.doctor_id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-300">
-                    <div className="h-48 bg-blue-50 flex items-center justify-center">
-                      {doctor.profile_picture ? (
-                        <img 
-                          src={doctor.profile_picture}
-                          alt={`Dr. ${doctor.first_name} ${doctor.last_name}`}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://via.placeholder.com/300x200?text=Doctor';
-                          }}
-                        />
-                      ) : (
-                        <div className="text-blue-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold text-blue-500 mb-2">Dr. {doctor.first_name} {doctor.last_name}</h3>
-                      <p className="text-blue-400 mb-3">{doctor.specialty_name}</p>
-                      
-                      <div className="space-y-2 text-gray-600 mb-4">
-                        {doctor.gender && (
-                          <p><span className="font-medium">Gender:</span> {doctor.gender}</p>
-                        )}
-                        {doctor.qualifications && (
-                          <p><span className="font-medium">Qualifications:</span> {doctor.qualifications}</p>
-                        )}
-                        {doctor.experience_years && (
-                          <p><span className="font-medium">Experience:</span> {doctor.experience_years} years</p>
-                        )}
-                        {doctor.languages_spoken && (
-                          <p><span className="font-medium">Languages:</span> {doctor.languages_spoken}</p>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {doctors.map((doctor) => (
+                    <div key={doctor.doctor_id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-300">
+                      <div className="h-48 bg-blue-50 flex items-center justify-center">
+                        {doctor.profile_picture ? (
+                          <img 
+                            src={doctor.profile_picture}
+                            alt={`Dr. ${doctor.first_name} ${doctor.last_name}`}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/300x200?text=Doctor';
+                            }}
+                          />
+                        ) : (
+                          <div className="text-blue-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
                         )}
                       </div>
                       
-                      {doctor.bio && (
-                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">{doctor.bio}</p>
-                      )}
-                      
-                      
+                      <div className="p-6">
+                        <h3 className="text-xl font-bold text-blue-500 mb-2">Dr. {doctor.first_name} {doctor.last_name}</h3>
+                        <p className="text-blue-400 mb-3">{doctor.specialty_name}</p>
+                        
+                        <div className="space-y-2 text-gray-600 mb-4">
+                          {doctor.gender && (
+                            <p><span className="font-medium">Gender:</span> {doctor.gender}</p>
+                          )}
+                          {doctor.qualifications && (
+                            <p><span className="font-medium">Qualifications:</span> {doctor.qualifications}</p>
+                          )}
+                          {doctor.experience_years && (
+                            <p><span className="font-medium">Experience:</span> {doctor.experience_years} years</p>
+                          )}
+                          {doctor.languages_spoken && (
+                            <p><span className="font-medium">Languages:</span> {doctor.languages_spoken}</p>
+                          )}
+                        </div>
+                        
+                        {doctor.bio && (
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2">{doctor.bio}</p>
+                        )}
+                        
+                        
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                  
+                  {doctors.length === 0 && !loading && (
+                    <div className="col-span-3 text-center py-10">
+                      <p className="text-gray-500">No doctors found.</p>
+                    </div>
+                  )}
+                </div>
                 
-                {doctors.length === 0 && !loading && (
-                  <div className="col-span-3 text-center py-10">
-                    <p className="text-gray-500">No doctors found.</p>
-                  </div>
-                )}
-              </div>
+                {/* View All Doctors Button */}
+                <div className="mt-12 text-center">
+                  <button
+                    onClick={() => router.push('/doctors')}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-300 inline-flex items-center"
+                  >
+                    <span>View All Doctors</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </>
             )}
-            
             
           </div>
         </section>
@@ -472,6 +534,7 @@ Appointment Details:
                       name="date"
                       value={formData.date}
                       onChange={handleInputChange}
+                      min={minDate}
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />

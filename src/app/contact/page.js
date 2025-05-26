@@ -47,7 +47,7 @@ export default function ContactPage() {
                   <h3 className="text-xl font-semibold ml-4">Call Us</h3>
                 </div>
                 <p className="text-gray-600">Main: +961</p>
-                <p className="text-gray-600">Emergency: +961</p>
+                <p className="text-gray-600">Emergency: 2133</p>
                 <p className="text-gray-600">Fax: +961</p>
               </div>
 

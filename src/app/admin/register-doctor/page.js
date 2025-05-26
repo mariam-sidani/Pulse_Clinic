@@ -14,6 +14,8 @@ export default function RegisterDoctor() {
   
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
+    confirmPassword: '',
     firstName: '',
     lastName: '',
     gender: '',
@@ -85,7 +87,7 @@ export default function RegisterDoctor() {
 
   const validateForm = () => {
     // Check required fields
-    if (!formData.email || !formData.firstName || !formData.lastName || !formData.licenseNumber || !formData.specialtyId) {
+    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.firstName || !formData.lastName || !formData.licenseNumber || !formData.specialtyId) {
       setError('Please fill in all required fields');
       return false;
     }
@@ -94,6 +96,18 @@ export default function RegisterDoctor() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
+      return false;
+    }
+
+    // Password validation
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+
+    // Confirm password
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
       return false;
     }
 
@@ -136,6 +150,8 @@ export default function RegisterDoctor() {
       setSuccessMessage('Doctor registered successfully. An email has been sent with login instructions.');
       setFormData({
         email: '',
+        password: '',
+        confirmPassword: '',
         firstName: '',
         lastName: '',
         gender: '',
@@ -233,6 +249,42 @@ export default function RegisterDoctor() {
                   placeholder="Enter email address"
                   required
                 />
+              </div>
+              
+              <div className="mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter password"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-gray-700 text-sm font-bold mb-2">
+                      Confirm Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Confirm password"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -137,7 +137,7 @@ export async function GET(request) {
         port: process.env.DATABASE_PORT || 3306,
         user: process.env.DATABASE_USER || 'root',
         password: process.env.DATABASE_PASSWORD || '',
-        database: process.env.DATABASE_NAME || 'clinic_agent_app',
+        database: process.env.DATABASE_NAME || 'pulse',
       });
       
       console.log('Admin users API: Database connected directly');
@@ -603,94 +603,114 @@ export async function PUT(request) {
 
 // Delete user
 export async function DELETE(request) {
+  const connection = await require('mysql2/promise').createConnection({
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: process.env.DATABASE_PORT || 3306,
+    user: process.env.DATABASE_USER || 'root',
+    password: process.env.DATABASE_PASSWORD || '',
+    database: process.env.DATABASE_NAME || 'pulse',
+  });
+
   try {
-    // Check if the request is from an admin
+    // Verify admin access
     const adminCheck = await isAdmin(request);
-    
     if (!adminCheck.authorized) {
       return NextResponse.json(
         { message: `Unauthorized access: ${adminCheck.reason}` },
         { status: 401 }
       );
     }
-    
+
     // Get user ID from URL
     const url = new URL(request.url);
     const userId = url.searchParams.get('userId');
-    
     if (!userId) {
       return NextResponse.json(
         { message: 'User ID is required' },
         { status: 400 }
       );
     }
-    
-    // Get existing user
-    const existingUsers = await executeQuery({
-      query: 'SELECT * FROM users WHERE user_id = ?',
-      values: [userId],
-    });
-    
-    if (existingUsers.length === 0) {
+
+    await connection.beginTransaction();
+
+    // Get user details first
+    const [users] = await connection.execute(
+      'SELECT * FROM users WHERE user_id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      await connection.rollback();
       return NextResponse.json(
         { message: 'User not found' },
         { status: 404 }
       );
     }
-    
-    const existingUser = existingUsers[0];
-    
-    // Begin transaction
-    const connection = await require('mysql2/promise').createConnection({
-      host: process.env.DATABASE_HOST || 'localhost',
-      port: process.env.DATABASE_PORT || 3306,
-      user: process.env.DATABASE_USER || 'root',
-      password: process.env.DATABASE_PASSWORD || '',
-      database: process.env.DATABASE_NAME || 'pulse',
-    });
-    
+
+    const user = users[0];
+
+    // Check if trying to delete an admin
+    if (user.role_id === 1) {
+      await connection.rollback();
+      return NextResponse.json(
+        { message: 'Admin users cannot be deleted' },
+        { status: 403 }
+      );
+    }
+
     try {
-      await connection.beginTransaction();
-      
-      // Delete role-specific records
-      if (existingUser.role_id === 2) { // Doctor
-        // Remove doctor from clinic associations
-        await connection.execute('DELETE FROM clinic_doctor WHERE doctor_id IN (SELECT doctor_id FROM doctors WHERE user_id = ?)', [userId]);
-        
-        // Remove doctor calendar entries
-        await connection.execute('DELETE FROM doctor_calendar WHERE doctor_id IN (SELECT doctor_id FROM doctors WHERE user_id = ?)', [userId]);
-        
-        // Remove appointment slots
-        await connection.execute('DELETE FROM appointment_slots WHERE doctor_id IN (SELECT doctor_id FROM doctors WHERE user_id = ?)', [userId]);
-        
-        // Delete doctor record
-        await connection.execute('DELETE FROM doctors WHERE user_id = ?', [userId]);
-      } else if (existingUser.role_id === 3) { // Patient
-        // Handle patient data deletion if needed (not implemented as per requirements)
+      // Delete based on role
+      if (user.role_id === 2) { // Doctor
+        // Delete from doctors table first
+        await connection.execute(
+          'DELETE FROM doctors WHERE user_id = ?',
+          [userId]
+        );
+      } else if (user.role_id === 3) { // Patient
+        // Delete from patients table first
+        await connection.execute(
+          'DELETE FROM patients WHERE user_id = ?',
+          [userId]
+        );
       }
-      
-      // Delete user files
-      await connection.execute('DELETE FROM user_files WHERE user_id = ?', [userId]);
-      
-      // Finally, delete the user
-      await connection.execute('DELETE FROM users WHERE user_id = ?', [userId]);
-      
+
+      // Finally delete the user
+      await connection.execute(
+        'DELETE FROM users WHERE user_id = ?',
+        [userId]
+      );
+
+      // Commit the transaction
       await connection.commit();
-      
+
       return NextResponse.json({
+        success: true,
         message: 'User deleted successfully'
       });
+
     } catch (error) {
+      console.error('SQL Error:', error);
       await connection.rollback();
       throw error;
-    } finally {
-      await connection.end();
     }
+
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error('Delete user error:', error);
+    
     return NextResponse.json(
-      { message: 'An error occurred while deleting user' },
+      { 
+        success: false,
+        message: 'An error occurred while deleting user',
+        error: error.message 
+      },
       { status: 500 }
     );
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
   }
 } 

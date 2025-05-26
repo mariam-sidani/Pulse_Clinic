@@ -70,6 +70,10 @@ export default function Login() {
     setShowDebugInfo(!showDebugInfo);
   };
 
+  const handleForgotPassword = () => {
+    alert('Please contact the clinic administrator to reset your password.\n\nAdmin Email: admin@pulseclinic.com\n\nThey will assist you with password recovery.');
+  };
+
   return (
     <RouteGuard allowedRoles={null}>
       <div className="min-h-screen flex flex-col">
@@ -158,9 +162,13 @@ export default function Login() {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-medium text-blue-500 hover:text-blue-400">
+                  <button 
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="font-medium text-blue-500 hover:text-blue-400 bg-transparent border-none cursor-pointer"
+                  >
                     Forgot your password?
-                  </a>
+                  </button>
                 </div>
               </div>
 
@@ -185,13 +193,7 @@ export default function Login() {
             </form>
             
             <div className="text-center text-xs">
-              <button
-                type="button"
-                onClick={toggleDebugInfo}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                {showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info'}
-              </button>
+             
             </div>
           </div>
         </div>

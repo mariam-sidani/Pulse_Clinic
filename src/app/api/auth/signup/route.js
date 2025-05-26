@@ -65,7 +65,7 @@ export async function POST(request) {
       // Create user with role_id 3 (Patient)
       const [userResult] = await connection.execute(
         'INSERT INTO users (email, password, role_id, is_active, is_verified) VALUES (?, ?, ?, ?, ?)',
-        [email, hashedPassword, 3, 1, 0] // is_verified set to 0 initially
+        [email, hashedPassword, 3, 1, 1] // is_verified set to 1 initially
       );
       
       const userId = userResult.insertId;

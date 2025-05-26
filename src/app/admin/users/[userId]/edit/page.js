@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -10,7 +10,7 @@ import { RouteGuard } from '@/components/wrappers';
 export default function EditUser({ params }) {
   const router = useRouter();
   const { user } = useUserStore();
-  const { userId } = params;
+  const { userId } = use(params);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

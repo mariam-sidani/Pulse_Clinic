@@ -86,7 +86,7 @@ export default function BloodDonationPage() {
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="flex justify-center items-center h-12 w-12 rounded-full bg-blue-500 text-white font-bold mb-3">1</div>
                     <h3 className="font-semibold text-gray-800 mb-2">Registration</h3>
-                    <p className="text-gray-700 text-sm">Sign in and complete a confidential medical history questionnaire.</p>
+                    <p className="text-gray-700 text-sm">Sign in to access your medical history.</p>
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="flex justify-center items-center h-12 w-12 rounded-full bg-blue-500 text-white font-bold mb-3">2</div>

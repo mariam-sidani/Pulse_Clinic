@@ -208,16 +208,24 @@ export default function AdminUserList() {
   };
 
   const confirmDeleteUser = (userId) => {
+    console.log('Confirming delete for user:', userId);
     setDeleteUserId(userId);
   };
 
   const cancelDeleteUser = () => {
+    console.log('Canceling delete operation');
     setDeleteUserId(null);
     setDeleteError(null);
+    setIsDeleting(false);
   };
 
   const handleDeleteUser = async () => {
-    if (!deleteUserId) return;
+    if (!deleteUserId) {
+      console.error('No deleteUserId found');
+      return;
+    }
+    
+    console.log('Starting delete process for user:', deleteUserId);
     
     try {
       setIsDeleting(true);
@@ -226,58 +234,98 @@ export default function AdminUserList() {
       const token = user?.token;
       
       if (!token) {
+        console.error('No token found in user object:', user);
         throw new Error('Authentication token not found');
       }
       
-      const response = await fetch(`/api/admin/users?userId=${deleteUserId}`, {
+      const deleteUrl = `/api/admin/users?userId=${deleteUserId}`;
+      console.log('Making delete request to:', deleteUrl);
+      
+      const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        credentials: 'include'  // Include cookies
+        credentials: 'include'
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete user');
+      console.log('Delete response received:', response.status);
+      
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        throw new Error('Invalid server response');
       }
       
-      fetchUsers();
+      if (!response.ok) {
+        throw new Error(data.message || `Server error: ${response.status}`);
+      }
       
+      // Clear modal first
       setDeleteUserId(null);
-    } catch (err) {
-      setDeleteError(err.message || 'An error occurred while deleting user');
-      console.error('Error deleting user:', err);
+      setDeleteError(null);
       
-      // If unauthorized, trigger logout
-      if (err.message && err.message.includes('Unauthorized')) {
-        setError('Your session has expired. Please log in again.');
-        setTimeout(() => {
-          logout();
-        }, 2000);
+      // Then refresh the list
+      await fetchUsers();
+      
+      // Show success message
+      alert('User deleted successfully');
+      
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setDeleteError(err.message || 'Failed to delete user');
+      
+      if (err.message.includes('Unauthorized')) {
+        logout();
       }
     } finally {
       setIsDeleting(false);
     }
   };
 
+  // Test API connectivity
+  const testAPI = async () => {
+    try {
+      console.log('Testing API connectivity...');
+      const response = await fetch('/api/admin/test-delete?userId=test123', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      console.log('API Test Result:', data);
+      alert(`API Test: ${data.success ? 'SUCCESS' : 'FAILED'} - ${data.message}`);
+    } catch (error) {
+      console.error('API Test Error:', error);
+      alert(`API Test FAILED: ${error.message}`);
+    }
+  };
+
   return (
     <div className="mt-6">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
-        <div className="flex flex-col md:flex-row gap-2">
+      <div className="flex flex-col md:flex-row items-center mb-6 space-y-4 md:space-y-0 md:space-x-4">
+        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
           <select
             value={selectedRole}
             onChange={handleRoleFilterChange}
-            className="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="shadow border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Roles</option>
             <option value="1">Admin</option>
             <option value="2">Doctor</option>
             <option value="3">Patient</option>
           </select>
-          
-          <form onSubmit={handleSearchSubmit} className="w-full md:w-auto flex">
+
+          <form onSubmit={handleSearchSubmit} className="flex">
             <input
               type="text"
               value={searchQuery}
@@ -293,31 +341,15 @@ export default function AdminUserList() {
             </button>
           </form>
         </div>
-        
-        <button
-          onClick={logout}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-        >
-          Logout
-        </button>
       </div>
 
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
           <p className="font-bold">Error</p>
           <p>{error}</p>
-          <div className="mt-2 text-sm">
-            <p>Debug information:</p>
-            <ul className="list-disc ml-5 mt-1">
-              <li>User logged in: {user ? 'Yes' : 'No'}</li>
-              <li>User role: {user?.role_id === 1 ? 'Admin' : user?.role_id === 2 ? 'Doctor' : user?.role_id === 3 ? 'Patient' : 'Unknown'}</li>
-              <li>Has token: {user?.token ? 'Yes' : 'No'}</li>
-              <li>Token length: {user?.token?.length || 0} characters</li>
-            </ul>
-            <p className="mt-2">
-              Try <button onClick={logout} className="text-red-600 underline">logging out</button> and logging back in.
-            </p>
-          </div>
+          <p className="mt-2">
+            Try <button onClick={logout} className="text-red-600 underline">logging out</button> and logging back in.
+          </p>
         </div>
       )}
       
@@ -376,7 +408,7 @@ export default function AdminUserList() {
                       </button>
                       <button 
                         onClick={() => confirmDeleteUser(user.user_id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-green-600 hover:text-green-900"
                       >
                         Delete
                       </button>
@@ -429,55 +461,59 @@ export default function AdminUserList() {
       
       {/* Delete confirmation modal */}
       {deleteUserId && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
-                      Delete User
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500">
-                        Are you sure you want to delete this user? This action cannot be undone.
-                      </p>
-                      {deleteError && (
-                        <p className="mt-2 text-sm text-red-600">
-                          {deleteError}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center"
+          onClick={() => !isDeleting && cancelDeleteUser()}
+        >
+          <div 
+            className="bg-white rounded-lg p-6 max-w-sm mx-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-gray-900">Delete User</h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to delete this user? This action cannot be undone.
+                  </p>
+                  {deleteError && (
+                    <p className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                      {deleteError}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button 
-                  type="button" 
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  onClick={handleDeleteUser}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </button>
-                <button 
-                  type="button" 
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={cancelDeleteUser}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-              </div>
+            </div>
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                type="button"
+                className={`inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={cancelDeleteUser}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={handleDeleteUser}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Deleting...
+                  </span>
+                ) : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
